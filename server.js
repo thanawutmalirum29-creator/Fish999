@@ -296,7 +296,7 @@ body.edit-mode button.edit-only{display:inline-flex}
   </div>
   <div class="summary-bar" id="summaryBar"></div>
   <div class="total-row">
-    <div class="total-badge">รวมจากนักเรียน: <b id="grandTotal">฿0</b></div>
+    <div class="total-badge" onclick="openStudentSummary()" style="cursor:pointer" title="คลิกดูรายละเอียด">รวมจากนักเรียน: <b id="grandTotal">฿0</b></div>
     <div class="extra-badge" onclick="openExtra()" title="คลิกเพื่อดู/จัดการเงินอื่นๆ">➕ เงินอื่นๆ: <b id="extraTotal">฿0</b></div>
     <div class="extra-badge" onclick="openExtra()" style="background:#ef444440"><b style="color:#f87171">💸 รายจ่าย: <span id="expenseTotal">฿0</span></b></div>
     <div class="total-badge" style="background:#fbbf2430">ยอดรวมทั้งหมด: <b id="allTotal" style="color:#fbbf24">฿0</b></div>
@@ -442,6 +442,15 @@ body.edit-mode button.edit-only{display:inline-flex}
     <p class="sub" id="confirmDelDetail" style="margin-bottom:16px"></p>
     <button class="btn btn-red" onclick="doConfirmDelete()">ยืนยัน ลบออก</button>
     <button class="btn btn-gray" onclick="cancelConfirmDelete()">ยกเลิก</button>
+  </div>
+</div>
+
+<!-- Modal: สรุปยอดนักเรียน -->
+<div class="overlay" id="studentSummaryOverlay">
+  <div class="modal" style="width:360px;max-width:95vw">
+    <h2>📊 สรุปยอดจากนักเรียน</h2>
+    <div id="studentSummaryContent" style="text-align:left;margin-top:12px"></div>
+    <button class="btn btn-gray" onclick="closeStudentSummary()" style="margin-top:12px">ปิด</button>
   </div>
 </div>
 
@@ -603,9 +612,43 @@ function confirmReset(){if(!requireEditOrPrompt())return;document.getElementById
 function closeReset(){document.getElementById('resetOverlay').classList.remove('show');}
 async function doReset(){try{applyState(await apiPost('/api/reset',{}));flashSave();render();document.getElementById('resetOverlay').classList.remove('show');}catch(e){}}
 
-['loginOverlay','customOverlay','qrOverlay','qrSettingsOverlay','addDateOverlay','extraOverlay','resetOverlay','confirmDelOverlay'].forEach(id=>{
+['loginOverlay','customOverlay','qrOverlay','qrSettingsOverlay','addDateOverlay','extraOverlay','resetOverlay','confirmDelOverlay','studentSummaryOverlay'].forEach(id=>{
   document.getElementById(id).addEventListener('click',function(e){if(e.target===this)this.classList.remove('show');});
 });
+
+function openStudentSummary(){
+  // คำนวณแต่ละวัน: สด, โอน, รวม
+  let totalCash=0,totalTransfer=0;
+  const rows=DATES.map((d,di)=>{
+    let cash=0,transfer=0;
+    STUDENTS.forEach(s=>{const p=getP(s.id,di);if(p){if(p.method==='transfer')transfer+=p.amount;else cash+=p.amount;}});
+    totalCash+=cash;totalTransfer+=transfer;
+    return '<tr><td>'+d+'</td><td style="color:#15803d">฿'+cash+'</td><td style="color:#1d4ed8">฿'+transfer+'</td><td style="font-weight:700">฿'+(cash+transfer)+'</td></tr>';
+  }).join('');
+  const grandCash=totalCash,grandTransfer=totalTransfer,grand=grandCash+grandTransfer;
+  document.getElementById('studentSummaryContent').innerHTML=
+    '<table style="width:100%;border-collapse:collapse;font-size:13px">'+
+    '<thead><tr style="background:#1e3a8a;color:#fff">'+
+    '<th style="padding:7px 8px;text-align:left;border-radius:6px 0 0 0">วันที่</th>'+
+    '<th style="padding:7px 8px">💵 สด</th>'+
+    '<th style="padding:7px 8px">📱 โอน</th>'+
+    '<th style="padding:7px 8px;border-radius:0 6px 0 0">รวม</th>'+
+    '</tr>'+
+    (DATES.length===0?'<tr><td colspan="4" style="text-align:center;padding:16px;color:#9ca3af">ยังไม่มีวันที่</td></tr>':rows)+
+    '<tr style="background:#f0f9ff;font-weight:700;border-top:2px solid #bfdbfe">'+
+    '<td style="padding:8px 8px">รวมทั้งหมด</td>'+
+    '<td style="padding:8px;color:#15803d;text-align:center">฿'+grandCash+'</td>'+
+    '<td style="padding:8px;color:#1d4ed8;text-align:center">฿'+grandTransfer+'</td>'+
+    '<td style="padding:8px;color:#2563eb;font-size:15px;text-align:center">฿'+grand+'</td>'+
+    '</tr></table>'+
+    '<div style="display:flex;gap:8px;margin-top:10px">'+
+    '<div style="flex:1;background:#dcfce7;border-radius:8px;padding:8px;text-align:center"><div style="font-size:11px;color:#15803d">💵 สดรวม</div><div style="font-size:16px;font-weight:700;color:#15803d">฿'+grandCash+'</div></div>'+
+    '<div style="flex:1;background:#dbeafe;border-radius:8px;padding:8px;text-align:center"><div style="font-size:11px;color:#1d4ed8">📱 โอนรวม</div><div style="font-size:16px;font-weight:700;color:#1d4ed8">฿'+grandTransfer+'</div></div>'+
+    '<div style="flex:1;background:#ede9fe;border-radius:8px;padding:8px;text-align:center"><div style="font-size:11px;color:#7c3aed">💰 รวมทั้งหมด</div><div style="font-size:16px;font-weight:700;color:#7c3aed">฿'+grand+'</div></div>'+
+    '</div>';
+  document.getElementById('studentSummaryOverlay').classList.add('show');
+}
+function closeStudentSummary(){document.getElementById('studentSummaryOverlay').classList.remove('show');}
 
 (async function init(){
   const pw=sessionStorage.getItem('editPassword');
