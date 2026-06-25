@@ -1,64 +1,116 @@
-# 🎣 เกมตกปลา
+# เช็คการจ่ายเงินห้อง ม.6/3 — เวอร์ชันเซิร์ฟเวอร์
 
-## โครงสร้างโปรเจกต์
+แปลงจากเว็บไฟล์เดียว (เก็บข้อมูลใน localStorage ในเครื่อง) ให้เป็นแอประบบเซิร์ฟเวอร์จริง:
+
+- **ดูได้ทุกคนโดยไม่ต้องใส่รหัส** — เห็นตาราง ยอดรวม สถานะการจ่ายได้ตลอด
+- **แก้ไขต้องผ่านรหัสก่อนเท่านั้น** — ติ๊กจ่ายเงิน เพิ่ม/ลบวันที่ เพิ่มเงินเข้า-ออก ล้างข้อมูล ฯลฯ ต้องกดปุ่ม "🔒 แก้ไข" มุมขวาบน แล้วใส่รหัสก่อน
+- **รหัสถูกตรวจที่เซิร์ฟเวอร์ทุกครั้ง** ไม่ใช่แค่ฝั่งเบราว์เซอร์ — ต่อให้มีคนเปิด DevTools แก้โค้ดในเบราว์เซอร์ตัวเอง ก็ยังติ๊กผ่านไม่ได้ถ้าไม่มีรหัสที่ถูกต้อง
+- ข้อมูลทั้งหมด (การชำระเงิน, วันที่, เงินเข้า-ออก) เก็บไว้ที่เซิร์ฟเวอร์ ไม่ใช่ในเบราว์เซอร์ของแต่ละคนอีกต่อไป — เปิดจากมือถือคนละเครื่องก็เห็นข้อมูลตรงกัน
+
+**รหัสแก้ไขเริ่มต้นคือ `251029`** (ตั้งเป็น environment variable `EDIT_PASSWORD` เพื่อเปลี่ยนได้ — ดูด้านล่าง)
+
+---
+
+## โครงสร้างไฟล์
 
 ```
-fishing-game/
-├── server.js              ← Express server (entry point)
+payment-tracker-server/
+├── server.js          ← Express server + API ทั้งหมด
+├── students.json      ← รายชื่อนักเรียน 36 คน
 ├── package.json
-├── .gitignore
-├── server/
-│   ├── fishData.js        ← ข้อมูลปลาทั้งหมด (อยู่ฝั่ง server)
-│   └── locationData.js    ← รายชื่อสถานที่
-└── public/                ← static files (browser)
+├── data/
+│   └── .gitkeep        (ไฟล์ data/state.json จะถูกสร้างอัตโนมัติตอนรันครั้งแรก)
+└── public/             ← ไฟล์หน้าเว็บ (HTML/CSS/JS) ที่ผู้ใช้เห็น
     ├── index.html
-    ├── museum.html
-    ├── storage.html
-    ├── css/               ← ใส่ไฟล์ CSS ที่มีอยู่แล้วตรงนี้
-    └── js/
-        ├── game.js
-        ├── museum.js
-        └── storage.js
+    ├── style.css
+    ├── app.js
+    └── images/
+        ├── qr10.jpg
+        ├── qr20.jpg
+        └── qr30.jpg
 ```
 
-## วิธีรันในเครื่อง
+---
+
+## รันทดสอบในเครื่องตัวเอง (ไม่บังคับ แต่แนะนำให้ลองก่อน deploy)
+
+ต้องมี [Node.js](https://nodejs.org) เวอร์ชัน 18 ขึ้นไป
 
 ```bash
+cd payment-tracker-server
 npm install
 npm start
-# เปิด http://localhost:3000
 ```
 
-## Deploy บน Render (ฟรี)
+แล้วเปิดเบราว์เซอร์ไปที่ `http://localhost:3000`
 
-1. Push โค้ดขึ้น GitHub
-2. ไปที่ [render.com](https://render.com) → New Web Service
-3. เชื่อม GitHub repo
-4. ตั้งค่า:
-   - Build Command: `npm install`
-   - Start Command: `npm start`
-5. Deploy!
+---
 
-## Deploy บน Railway
+## ขั้นที่ 1: ขึ้น GitHub
+
+1. ไปที่ [github.com/new](https://github.com/new) สร้าง repository ใหม่ (เช่นชื่อ `payment-tracker`) — เลือก **Private** ได้ถ้าไม่อยากให้คนอื่นเห็นโค้ด (แต่หน้าเว็บจริงจะดูได้ตามปกติอยู่ดีหลัง deploy)
+2. ในเครื่องตัวเอง ที่โฟลเดอร์ `payment-tracker-server`:
 
 ```bash
-# ติดตั้ง Railway CLI
-npm install -g @railway/cli
-railway login
-railway init
-railway up
+git init
+git add .
+git commit -m "Initial commit: payment tracker server"
+git branch -M main
+git remote add origin https://github.com/<ชื่อบัญชีคุณ>/payment-tracker.git
+git push -u origin main
 ```
 
-## API Endpoints
+---
 
-| Endpoint | คำอธิบาย |
-|----------|----------|
-| `GET /api/locations` | รายชื่อสถานที่ทั้งหมด |
-| `GET /api/fish?location=river` | ข้อมูลปลาใน location นั้น |
+## ขั้นที่ 2: Deploy บน Railway
 
-## ⚠️ CSS ที่ต้องเพิ่มเอง
+1. ไปที่ [railway.app](https://railway.app) → ล็อกอินด้วย GitHub
+2. กด **New Project** → **Deploy from GitHub repo** → เลือก repo ที่ push ไปขั้นที่ 1
+3. Railway จะ build และรันให้อัตโนมัติ (เจอ `package.json` → รู้ว่าต้อง `npm install` แล้ว `npm start`)
+4. ไปที่แท็บ **Settings** ของ service → กด **Generate Domain** เพื่อได้ลิงก์สาธารณะ (เช่น `xxxx.up.railway.app`) — นี่คือลิงก์ที่แจกให้ห้องใช้
 
-คัดลอกไฟล์ CSS เดิมของคุณเข้าโฟลเดอร์ `public/css/`:
-- `public/css/style.css` (จากไฟล์ styleตกปลา.css เดิม)
-- `public/css/museum.css`
-- `public/css/storage.css`
+### ตั้งรหัสแก้ไขของตัวเอง (แนะนำให้เปลี่ยนจาก 251029)
+
+ไปที่แท็บ **Variables** → กด **New Variable**:
+
+| ชื่อ | ค่า |
+|---|---|
+| `EDIT_PASSWORD` | รหัสที่ต้องการ เช่น `251029` หรือรหัสอื่นที่อยากใช้ |
+
+กด **Deploy** อีกครั้งให้ตัวแปรมีผล
+
+### ⚠️ สำคัญมาก — ทำให้ข้อมูลไม่หายตอน deploy ใหม่ (ใช้ Volume)
+
+ปริยาย Railway จะรีเซ็ตไฟล์ในเครื่อง container ทุกครั้งที่ deploy ใหม่ (เช่น push โค้ดเพิ่ม) ซึ่งหมายความว่า**ข้อมูลการจ่ายเงินจะหายได้** ถ้าไม่ตั้งค่า Volume ไว้ เพราะนี่เป็นเรื่องเงินที่สำคัญ ให้ทำตามนี้:
+
+1. ในหน้า service บน Railway → แท็บ **Settings** → เลื่อนหา **Volumes** → กด **Add Volume**
+2. ตั้ง **Mount path** เป็น `/data`
+3. กลับไปแท็บ **Variables** → เพิ่มตัวแปร:
+
+| ชื่อ | ค่า |
+|---|---|
+| `DATA_DIR` | `/data` |
+
+4. Deploy ใหม่อีกครั้ง
+
+ตอนนี้ไฟล์ข้อมูล (`/data/state.json`) จะอยู่ใน Volume แยกจาก container หลัก ต่อให้ deploy โค้ดใหม่กี่ครั้ง ข้อมูลก็จะยังอยู่
+
+**ถ้าไม่ตั้ง Volume:** ระบบยังใช้งานได้ปกติ แต่ทุกครั้งที่ deploy โค้ดใหม่ ข้อมูลการจ่ายเงินทั้งหมดจะถูกรีเซ็ตกลับเป็นค่าเริ่มต้น — เหมาะสำหรับทดลองเล่นเฉยๆ ไม่เหมาะกับการเก็บข้อมูลจริง
+
+---
+
+## วิธีใช้งานสำหรับห้อง
+
+- **นักเรียนทั่วไป**: เปิดลิงก์ดูได้เลย เห็นว่าใครจ่ายแล้วบ้าง ไม่ต้องใส่รหัส
+- **คนที่ดูแลเก็บเงิน (เช่น หัวหน้าห้อง/เหรัญญิก)**: กดปุ่ม "🔒 แก้ไข" มุมขวาบน → ใส่รหัส → ติ๊กจ่ายเงิน/เพิ่มวันที่/จัดการเงินอื่นๆ ได้ตามปกติ
+- กดปุ่มเดิม (ตอนนี้จะเปลี่ยนเป็น "🔓 ออกจากโหมดแก้ไข") เพื่อล็อกกลับเป็นโหมดดูอย่างเดียว
+
+รหัสจะถูกจำไว้ในเบราว์เซอร์ของอุปกรณ์นั้น (sessionStorage) จนกว่าจะปิดแท็บ หรือกดออกจากโหมดแก้ไขเอง — อุปกรณ์อื่นต้องใส่รหัสของตัวเอง
+
+---
+
+## ปรับแต่งเพิ่มเติม
+
+- **เปลี่ยนรายชื่อนักเรียน**: แก้ไฟล์ `students.json` (รูปแบบ `{id, num, prefix, fname, lname}`) แล้ว push ขึ้น GitHub ใหม่ — Railway จะ deploy ให้อัตโนมัติ
+- **เปลี่ยนรูป QR สำหรับยอด 10/20/30 บาท**: แทนไฟล์ใน `public/images/qr10.jpg`, `qr20.jpg`, `qr30.jpg`
+- **ดูข้อมูลดิบ/สำรองข้อมูล**: ถ้าตั้ง Volume ไว้ สามารถดูไฟล์ `/data/state.json` ผ่าน Railway CLI (`railway run cat /data/state.json`) เพื่อสำรองข้อมูลเป็นระยะได้

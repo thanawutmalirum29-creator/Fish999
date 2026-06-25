@@ -1,16 +1,15 @@
 {
-  "name": "fishing-game",
+  "name": "payment-tracker-server",
   "version": "1.0.0",
-  "description": "เกมตกปลา",
+  "description": "เช็คการจ่ายเงินห้อง ม.6/3 — server-based version with password-gated edits",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "node --watch server.js"
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
   },
   "dependencies": {
     "express": "^4.19.2"
-  },
-  "engines": {
-    "node": ">=18.0.0"
   }
 }
