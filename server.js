@@ -70,11 +70,19 @@ function loadState() {
   catch (e) { return defaultState(); }
 }
 function saveState() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(DATA_PATH, JSON.stringify(state, null, 2));
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(DATA_PATH, JSON.stringify(state, null, 2));
+  } catch (e) {
+    console.error('บันทึกไฟล์ data ไม่สำเร็จ:', e.message);
+  }
 }
 let state = loadState();
-if (!fs.existsSync(DATA_PATH)) saveState();
+try {
+  if (!fs.existsSync(DATA_PATH)) saveState();
+} catch (e) {
+  console.error('เขียนไฟล์ data ไม่สำเร็จตอนสตาร์ท (จะทำงานแบบไม่บันทึกถาวร):', e.message);
+}
 
 function requirePassword(req, res) {
   if ((req.body && req.body.password) !== EDIT_PASSWORD) {
@@ -524,7 +532,16 @@ function applyState(d){
   if(d.students)STUDENTS=d.students;if(d.qrAmounts)QR_AMOUNTS=d.qrAmounts;if(d.defaultAmount)DEFAULT_AMOUNT=d.defaultAmount;
   DATES=d.DATES||[];payments=d.payments||{};extraItems=d.extraItems||[];expenseItems=d.expenseItems||[];qrValue=d.qrValue||'';
 }
-async function loadInitialState(){try{applyState(await apiGet('/api/state'));render();}catch(e){document.getElementById('saveIndicator').textContent='⚠️ เชื่อมต่อเซิร์ฟเวอร์ไม่ได้';}}
+async function loadInitialState(){
+  try{
+    applyState(await apiGet('/api/state'));
+    render();
+    document.getElementById('saveIndicator').textContent='🌐 เชื่อมต่อเซิร์ฟเวอร์';
+  }catch(e){
+    document.getElementById('saveIndicator').innerHTML='⚠️ โหลดข้อมูลไม่สำเร็จ <button onclick="loadInitialState()" style="margin-left:6px;padding:2px 8px;border:none;border-radius:6px;background:#ef4444;color:#fff;font-size:11px;cursor:pointer;font-family:inherit">ลองใหม่</button>';
+    setTimeout(loadInitialState,3000);
+  }
+}
 async function backgroundRefresh(){if(document.querySelector('.overlay.show'))return;try{applyState(await apiGet('/api/state'));render();}catch(e){}}
 setInterval(backgroundRefresh,6000);
 
