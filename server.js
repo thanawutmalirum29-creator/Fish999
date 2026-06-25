@@ -70,19 +70,11 @@ function loadState() {
   catch (e) { return defaultState(); }
 }
 function saveState() {
-  try {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-    fs.writeFileSync(DATA_PATH, JSON.stringify(state, null, 2));
-  } catch (e) {
-    console.error('บันทึกไฟล์ data ไม่สำเร็จ:', e.message);
-  }
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(DATA_PATH, JSON.stringify(state, null, 2));
 }
 let state = loadState();
-try {
-  if (!fs.existsSync(DATA_PATH)) saveState();
-} catch (e) {
-  console.error('เขียนไฟล์ data ไม่สำเร็จตอนสตาร์ท (จะทำงานแบบไม่บันทึกถาวร):', e.message);
-}
+if (!fs.existsSync(DATA_PATH)) saveState();
 
 function requirePassword(req, res) {
   if ((req.body && req.body.password) !== EDIT_PASSWORD) {
@@ -289,37 +281,7 @@ body.edit-mode button.edit-only{display:inline-flex}
 .extra-empty{text-align:center;font-size:12px;color:#9ca3af;padding:16px 0}
 .extra-input-row{display:none;grid-template-columns:1fr 100px;gap:8px;margin-bottom:10px}
 .extra-input-row input{padding:9px 10px;font-size:13px;border:1.5px solid #e5e7eb;border-radius:8px;font-family:inherit;outline:none}
-.search-bar{display:flex;align-items:center;gap:6px;padding:8px 8px 0;position:relative}
-.search-bar input{flex:1;padding:8px 32px 8px 12px;font-size:13px;border:1.5px solid #e5e7eb;border-radius:8px;font-family:inherit;outline:none;background:#fff;transition:.15s}
-.search-bar input:focus{border-color:#3b82f6;box-shadow:0 0 0 3px #3b82f620}
-.search-clear{position:absolute;right:14px;border:none;background:none;color:#9ca3af;font-size:16px;cursor:pointer;padding:0 6px;line-height:1}
-.search-clear:hover{color:#374151}
-.btn-export{background:#8b5cf6;color:#fff}
-.clickable-badge:hover{background:#ffffff40!important;transform:scale(1.02)}
-.clickable-badge{transition:.15s}
-.summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
-.sum-stat-card{background:#f8fafc;border-radius:10px;padding:10px 12px;text-align:center;border:1px solid #e5e7eb}
-.sum-stat-card .s-label{font-size:11px;color:#6b7280;margin-bottom:4px}
-.sum-stat-card .s-val{font-size:18px;font-weight:700;color:#111}
-.sum-stat-card.cash .s-val{color:#16a34a}
-.sum-stat-card.transfer .s-val{color:#2563eb}
-.sum-stat-card.total .s-val{color:#1e3a8a}
-.sum-stat-card.count .s-val{font-size:15px}
-.summary-dates-table{margin-bottom:12px;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;max-height:220px;overflow-y:auto}
-.summary-dates-table table{width:100%;border-collapse:collapse;font-size:12px}
-.summary-dates-table th{background:#1e3a8a;color:#fff;padding:6px 8px;text-align:center;font-weight:600;position:sticky;top:0}
-.summary-dates-table td{padding:5px 8px;text-align:center;border-bottom:1px solid #f1f5f9}
-.summary-dates-table tr:last-child td{border-bottom:none}
-.summary-dates-table tr:nth-child(even) td{background:#f8fafc}
-.td-cash{color:#16a34a;font-weight:600}
-.td-transfer{color:#2563eb;font-weight:600}
-.td-total{color:#1e3a8a;font-weight:700}
-.summary-unpaid{text-align:left}
-.summary-unpaid .unpaid-title{font-size:12px;font-weight:600;color:#dc2626;margin-bottom:6px}
-.unpaid-list{display:flex;flex-wrap:wrap;gap:4px}
-.unpaid-chip{background:#fee2e2;color:#dc2626;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:500}
-.paid-info{font-size:12px;color:#16a34a;font-weight:600;margin-bottom:6px}
-.row-hidden{display:none}
+.extra-input-row input:focus{border-color:#22c55e}
 </style>
 </head>
 <body>
@@ -334,7 +296,7 @@ body.edit-mode button.edit-only{display:inline-flex}
   </div>
   <div class="summary-bar" id="summaryBar"></div>
   <div class="total-row">
-    <div class="total-badge clickable-badge" onclick="openStudentSummary()" title="คลิกเพื่อดูสรุปยอดละเอียด" style="cursor:pointer;user-select:none">📊 รวมจากนักเรียน: <b id="grandTotal">฿0</b></div>
+    <div class="total-badge">รวมจากนักเรียน: <b id="grandTotal">฿0</b></div>
     <div class="extra-badge" onclick="openExtra()" title="คลิกเพื่อดู/จัดการเงินอื่นๆ">➕ เงินอื่นๆ: <b id="extraTotal">฿0</b></div>
     <div class="extra-badge" onclick="openExtra()" style="background:#ef444440"><b style="color:#f87171">💸 รายจ่าย: <span id="expenseTotal">฿0</span></b></div>
     <div class="total-badge" style="background:#fbbf2430">ยอดรวมทั้งหมด: <b id="allTotal" style="color:#fbbf24">฿0</b></div>
@@ -345,12 +307,7 @@ body.edit-mode button.edit-only{display:inline-flex}
   <button class="tool-btn btn-add-date edit-only" onclick="openAddDate()">➕ เพิ่มวันที่</button>
   <button class="tool-btn btn-qr-settings edit-only" onclick="openQRSettings()">📱 ตั้งค่า QR</button>
   <button class="tool-btn btn-reset edit-only" onclick="confirmReset()">🗑 ล้างข้อมูล</button>
-  <button class="tool-btn btn-export" onclick="exportCSV()" title="ส่งออกข้อมูล CSV">📥 Export</button>
   <span class="save-indicator" id="saveIndicator">🌐 เชื่อมต่อเซิร์ฟเวอร์</span>
-</div>
-<div class="search-bar">
-  <input type="text" id="searchInput" placeholder="🔍 ค้นหาชื่อนักเรียน..." oninput="filterTable(this.value)">
-  <button class="search-clear" onclick="clearSearch()" id="searchClearBtn" style="display:none">✕</button>
 </div>
 
 <div class="table-wrap">
@@ -488,18 +445,6 @@ body.edit-mode button.edit-only{display:inline-flex}
   </div>
 </div>
 
-<!-- Modal: สรุปยอดจากนักเรียน -->
-<div class="overlay" id="studentSummaryOverlay">
-  <div class="modal" style="width:360px;max-width:95vw">
-    <h2>📊 สรุปยอดจากนักเรียน</h2>
-    <p class="sub" id="summaryDateRange" style="margin-bottom:14px"></p>
-    <div class="summary-grid" id="summaryGrid"></div>
-    <div class="summary-dates-table" id="summaryDatesTable"></div>
-    <div class="summary-unpaid" id="summaryUnpaid"></div>
-    <button class="btn btn-gray" onclick="closeStudentSummary()" style="margin-top:8px">ปิด</button>
-  </div>
-</div>
-
 <!-- Modal: ล้างข้อมูล -->
 <div class="overlay" id="resetOverlay">
   <div class="modal">
@@ -532,16 +477,7 @@ function applyState(d){
   if(d.students)STUDENTS=d.students;if(d.qrAmounts)QR_AMOUNTS=d.qrAmounts;if(d.defaultAmount)DEFAULT_AMOUNT=d.defaultAmount;
   DATES=d.DATES||[];payments=d.payments||{};extraItems=d.extraItems||[];expenseItems=d.expenseItems||[];qrValue=d.qrValue||'';
 }
-async function loadInitialState(){
-  try{
-    applyState(await apiGet('/api/state'));
-    render();
-    document.getElementById('saveIndicator').textContent='🌐 เชื่อมต่อเซิร์ฟเวอร์';
-  }catch(e){
-    document.getElementById('saveIndicator').innerHTML='⚠️ โหลดข้อมูลไม่สำเร็จ <button onclick="loadInitialState()" style="margin-left:6px;padding:2px 8px;border:none;border-radius:6px;background:#ef4444;color:#fff;font-size:11px;cursor:pointer;font-family:inherit">ลองใหม่</button>';
-    setTimeout(loadInitialState,3000);
-  }
-}
+async function loadInitialState(){try{applyState(await apiGet('/api/state'));render();}catch(e){document.getElementById('saveIndicator').textContent='⚠️ เชื่อมต่อเซิร์ฟเวอร์ไม่ได้';}}
 async function backgroundRefresh(){if(document.querySelector('.overlay.show'))return;try{applyState(await apiGet('/api/state'));render();}catch(e){}}
 setInterval(backgroundRefresh,6000);
 
@@ -667,101 +603,9 @@ function confirmReset(){if(!requireEditOrPrompt())return;document.getElementById
 function closeReset(){document.getElementById('resetOverlay').classList.remove('show');}
 async function doReset(){try{applyState(await apiPost('/api/reset',{}));flashSave();render();document.getElementById('resetOverlay').classList.remove('show');}catch(e){}}
 
-['loginOverlay','customOverlay','qrOverlay','qrSettingsOverlay','addDateOverlay','extraOverlay','resetOverlay','confirmDelOverlay','studentSummaryOverlay'].forEach(id=>{
+['loginOverlay','customOverlay','qrOverlay','qrSettingsOverlay','addDateOverlay','extraOverlay','resetOverlay','confirmDelOverlay'].forEach(id=>{
   document.getElementById(id).addEventListener('click',function(e){if(e.target===this)this.classList.remove('show');});
 });
-
-// ============================================================
-// STUDENT SUMMARY POPUP
-// ============================================================
-function openStudentSummary(){
-  const grid=document.getElementById('summaryGrid');
-  const datesTable=document.getElementById('summaryDatesTable');
-  const unpaidDiv=document.getElementById('summaryUnpaid');
-  const dateRange=document.getElementById('summaryDateRange');
-
-  // Overall totals
-  let totalCash=0,totalTransfer=0,paidCount=0,neverPaid=[];
-  STUDENTS.forEach(s=>{
-    let hasPaid=false;
-    DATES.forEach((_,di)=>{
-      const p=getP(s.id,di);
-      if(p){hasPaid=true;if(p.method==='cash')totalCash+=p.amount;else totalTransfer+=p.amount;}
-    });
-    if(hasPaid)paidCount++;else neverPaid.push(s.fname);
-  });
-  const total=totalCash+totalTransfer;
-
-  dateRange.textContent='วันที่ '+DATES.join(', ');
-
-  // Summary cards
-  grid.innerHTML=
-    '<div class="sum-stat-card total"><div class="s-label">💰 รวมทั้งหมด</div><div class="s-val">฿'+total+'</div></div>'+
-    '<div class="sum-stat-card count"><div class="s-label">👥 จ่ายแล้ว / ทั้งหมด</div><div class="s-val">'+paidCount+' / '+STUDENTS.length+' คน</div></div>'+
-    '<div class="sum-stat-card cash"><div class="s-label">💵 เงินสด</div><div class="s-val">฿'+totalCash+'</div></div>'+
-    '<div class="sum-stat-card transfer"><div class="s-label">📱 โอน</div><div class="s-val">฿'+totalTransfer+'</div></div>';
-
-  // Per-date breakdown
-  let rows='';
-  DATES.forEach((d,di)=>{
-    let dc=0,dt=0,cnt=0;
-    STUDENTS.forEach(s=>{const p=getP(s.id,di);if(p){cnt++;if(p.method==='cash')dc+=p.amount;else dt+=p.amount;}});
-    rows+='<tr><td><b>'+d+'</b></td><td class="td-cash">฿'+dc+'</td><td class="td-transfer">฿'+dt+'</td><td class="td-total">฿'+(dc+dt)+'</td><td style="color:#6b7280">'+cnt+'/'+STUDENTS.length+'</td></tr>';
-  });
-  datesTable.innerHTML='<table><thead><tr><th>วันที่</th><th>สด</th><th>โอน</th><th>รวม</th><th>จ่าย</th></tr></thead><tbody>'+rows+'</tbody></table>';
-
-  // Unpaid section - show for last date or overall
-  const lastDi=DATES.length-1;
-  if(DATES.length>0){
-    const unpaidLastDate=STUDENTS.filter(s=>!getP(s.id,lastDi)).map(s=>s.fname);
-    let html='';
-    if(neverPaid.length){
-      html+='<div class="unpaid-title">❌ ยังไม่เคยจ่ายเลย ('+neverPaid.length+' คน)</div><div class="unpaid-list">'+neverPaid.map(n=>'<span class="unpaid-chip">'+n+'</span>').join('')+'</div>';
-    } else {
-      html+='<div class="paid-info">✅ ทุกคนเคยจ่ายแล้วอย่างน้อย 1 ครั้ง</div>';
-    }
-    if(DATES.length>0 && unpaidLastDate.length){
-      html+='<div class="unpaid-title" style="margin-top:8px">⏳ ยังไม่จ่ายวัน '+DATES[lastDi]+' ('+unpaidLastDate.length+' คน)</div><div class="unpaid-list">'+unpaidLastDate.map(n=>'<span class="unpaid-chip">'+n+'</span>').join('')+'</div>';
-    }
-    unpaidDiv.innerHTML=html;
-  } else {unpaidDiv.innerHTML='';}
-
-  document.getElementById('studentSummaryOverlay').classList.add('show');
-}
-function closeStudentSummary(){document.getElementById('studentSummaryOverlay').classList.remove('show');}
-
-// ============================================================
-// SEARCH
-// ============================================================
-function filterTable(q){
-  const val=q.trim().toLowerCase();
-  document.getElementById('searchClearBtn').style.display=val?'block':'none';
-  const rows=document.querySelectorAll('#tbody tr');
-  rows.forEach(tr=>{
-    const name=tr.querySelector('.name-col')?tr.querySelector('.name-col').textContent.toLowerCase():'';
-    tr.classList.toggle('row-hidden',!!(val&&!name.includes(val)));
-  });
-}
-function clearSearch(){document.getElementById('searchInput').value='';filterTable('');}
-
-// ============================================================
-// EXPORT CSV
-// ============================================================
-function exportCSV(){
-  const header=['#','ชื่อ','นามสกุล',...DATES,'รวม'].join(',');
-  const rows=STUDENTS.map((s,idx)=>{
-    const cols=[idx+1,s.fname,s.lname];
-    DATES.forEach((_,di)=>{const p=getP(s.id,di);cols.push(p?p.amount:0);});
-    cols.push(totalByStudent(s.id));
-    return cols.join(',');
-  });
-  const csv='\ufeff'+header+'\n'+rows.join('\n');
-  const blob=new Blob([csv],{type:'text/csv;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');a.href=url;
-  a.download='payment_'+new Date().toLocaleDateString('th-TH').replace(/\//g,'-')+'.csv';
-  a.click();URL.revokeObjectURL(url);
-}
 
 (async function init(){
   const pw=sessionStorage.getItem('editPassword');
