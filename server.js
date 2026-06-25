@@ -5,17 +5,11 @@ const path = require('path');
 const app = express();
 app.use(express.json());
 
-// ------------------------------------------------------------
-// CONFIG
-// ------------------------------------------------------------
 const EDIT_PASSWORD = process.env.EDIT_PASSWORD || '251029';
 const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, 'data');
 const DATA_PATH = path.join(DATA_DIR, 'state.json');
 const PORT = process.env.PORT || 3000;
 
-// ------------------------------------------------------------
-// STUDENTS (ฝังไว้ใน server เลย ไม่ต้องมีไฟล์แยก)
-// ------------------------------------------------------------
 const STUDENTS = [
   { id: 1,  prefix: 'น.ส.', fname: 'สุภาวดี',     lname: 'สุขหนองบึง' },
   { id: 2,  prefix: 'นาย',  fname: 'กันตพัฒน์',   lname: 'พิเชียรโสภณ' },
@@ -59,9 +53,6 @@ const QR_AMOUNTS = [10, 20, 30];
 const DEFAULT_AMOUNT = 10;
 const DEFAULT_DATES = ['21/5', '28/5', '4/6', '11/6', '18/6', '25/6'];
 
-// ------------------------------------------------------------
-// PERSISTENCE
-// ------------------------------------------------------------
 function defaultState() {
   return { DATES: [...DEFAULT_DATES], payments: {}, extraItems: [], expenseItems: [], qrValue: '' };
 }
@@ -89,9 +80,6 @@ function publicState() {
     expenseItems: state.expenseItems, qrValue: state.qrValue };
 }
 
-// ------------------------------------------------------------
-// API ROUTES
-// ------------------------------------------------------------
 app.get('/api/state', (req, res) => res.json(publicState()));
 
 app.post('/api/auth/check', (req, res) => {
@@ -140,6 +128,19 @@ app.post('/api/dates/delete', (req, res) => {
   saveState(); res.json(publicState());
 });
 
+app.post('/api/dates/checkall', (req, res) => {
+  if (!requirePassword(req, res)) return;
+  const di = req.body.di;
+  if (di == null || di < 0 || di >= state.DATES.length) return res.status(400).json({ error: 'ไม่พบวันที่นี้' });
+  const method = req.body.method === 'transfer' ? 'transfer' : 'cash';
+  const amount = (req.body.amount && req.body.amount > 0) ? req.body.amount : DEFAULT_AMOUNT;
+  STUDENTS.forEach(s => {
+    if (!state.payments[s.id]) state.payments[s.id] = {};
+    if (!state.payments[s.id][di]) state.payments[s.id][di] = { method, amount };
+  });
+  saveState(); res.json(publicState());
+});
+
 app.post('/api/extra', (req, res) => {
   if (!requirePassword(req, res)) return;
   const { kind, label, amount } = req.body;
@@ -169,9 +170,6 @@ app.post('/api/reset', (req, res) => {
   state = defaultState(); saveState(); res.json(publicState());
 });
 
-// ------------------------------------------------------------
-// SERVE HTML (ทุกอย่างรวมในไฟล์เดียว ไม่ต้องมีโฟลเดอร์ public)
-// ------------------------------------------------------------
 const HTML = `<!DOCTYPE html>
 <html lang="th">
 <head>
@@ -210,9 +208,11 @@ table{border-collapse:separate;border-spacing:0;width:100%;min-width:400px}
 thead tr{background:#1e3a8a;color:#fff}
 th{padding:9px 5px;font-size:11px;font-weight:600;text-align:center;white-space:nowrap}
 th.name-col{text-align:left;padding-left:10px}
-th.date-th{position:relative;min-width:52px}
+th.date-th{position:relative;min-width:60px}
 .del-date-btn{position:absolute;top:2px;right:2px;background:#ffffff30;border:none;color:#fff;border-radius:4px;font-size:9px;cursor:pointer;padding:1px 4px;line-height:1.4}
 .del-date-btn:hover{background:#ef4444}
+.checkall-date-btn{position:absolute;top:2px;left:2px;background:#22c55e;border:none;color:#fff;border-radius:4px;font-size:9px;cursor:pointer;padding:1px 4px;line-height:1.4}
+.checkall-date-btn:hover{background:#16a34a}
 td{padding:4px 3px;text-align:center;border-bottom:1px solid #f1f5f9;font-size:12px}
 td.name-col{text-align:left;padding-left:8px;line-height:1.4}
 .prefix{font-size:10px;color:#9ca3af}
@@ -303,17 +303,14 @@ body.edit-mode button.edit-only{display:inline-flex}
   </div>
 </div>
 
-<!-- Modal: สรุปจากนักเรียน -->
 <div class="overlay" id="studentSummaryOverlay">
   <div class="modal" style="width:min(96vw,520px);max-height:90vh;overflow-y:auto;padding:20px 16px 16px">
     <h2 style="margin-bottom:6px">📊 สรุปรายได้จากนักเรียน</h2>
     <p class="sub" style="margin-bottom:14px;font-size:12px;color:#6b7280">แยกตามวันที่และวิธีชำระ</p>
 
-    <!-- ยอดรวมใหญ่ -->
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px" id="summBig">
     </div>
 
-    <!-- ตารางรายวัน -->
     <div style="overflow-x:auto;border-radius:10px;border:1px solid #e5e7eb;margin-bottom:14px">
       <table id="summTable" style="border-collapse:collapse;width:100%;min-width:300px;font-size:12px">
         <thead>
@@ -352,7 +349,6 @@ body.edit-mode button.edit-only{display:inline-flex}
 </div>
 <p class="hint" id="modeHint">🔒 อยู่ในโหมดดูอย่างเดียว — กดปุ่ม "แก้ไข" มุมขวาบนแล้วใส่รหัสเพื่อติ๊ก/เพิ่มข้อมูล</p>
 
-<!-- Modal: ใส่รหัส -->
 <div class="overlay" id="loginOverlay">
   <div class="modal">
     <h2>🔑 ใส่รหัสแก้ไข</h2>
@@ -364,7 +360,6 @@ body.edit-mode button.edit-only{display:inline-flex}
   </div>
 </div>
 
-<!-- Modal: เลือกราคา -->
 <div class="overlay" id="customOverlay">
   <div class="modal">
     <h2>💰 เลือกยอดชำระ</h2>
@@ -386,7 +381,6 @@ body.edit-mode button.edit-only{display:inline-flex}
   </div>
 </div>
 
-<!-- Modal: QR Code -->
 <div class="overlay" id="qrOverlay">
   <div class="modal">
     <h2>สแกน QR โอนเงิน</h2>
@@ -401,7 +395,6 @@ body.edit-mode button.edit-only{display:inline-flex}
   </div>
 </div>
 
-<!-- Modal: ตั้งค่า QR -->
 <div class="overlay" id="qrSettingsOverlay">
   <div class="modal">
     <h2>📱 ตั้งค่า QR Code</h2>
@@ -423,7 +416,6 @@ body.edit-mode button.edit-only{display:inline-flex}
   </div>
 </div>
 
-<!-- Modal: เพิ่มวันที่ -->
 <div class="overlay" id="addDateOverlay">
   <div class="modal">
     <h2>➕ เพิ่มวันที่</h2>
@@ -434,7 +426,6 @@ body.edit-mode button.edit-only{display:inline-flex}
   </div>
 </div>
 
-<!-- Modal: เงินเข้า/ออก -->
 <div class="overlay" id="extraOverlay">
   <div class="modal">
     <h2>💰 เงินเข้า / เงินออก</h2>
@@ -468,7 +459,6 @@ body.edit-mode button.edit-only{display:inline-flex}
   </div>
 </div>
 
-<!-- Modal: ยืนยันลบ -->
 <div class="overlay" id="confirmDelOverlay">
   <div class="modal">
     <h2>🗑 ลบการชำระ?</h2>
@@ -479,7 +469,6 @@ body.edit-mode button.edit-only{display:inline-flex}
   </div>
 </div>
 
-<!-- Modal: ล้างข้อมูล -->
 <div class="overlay" id="resetOverlay">
   <div class="modal">
     <h2>⚠️ ล้างข้อมูลทั้งหมด?</h2>
@@ -490,15 +479,9 @@ body.edit-mode button.edit-only{display:inline-flex}
 </div>
 
 <script>
-// ============================================================
-// STATE
-// ============================================================
 let STUDENTS=[],QR_AMOUNTS=[10,20,30],DEFAULT_AMOUNT=10,DATES=[],payments={},extraItems=[],expenseItems=[],qrValue='';
 let pendingCell=null,pendingDelete=null,activeTab='income',editMode=false;
 
-// ============================================================
-// API
-// ============================================================
 async function apiGet(url){const r=await fetch(url);if(!r.ok)throw new Error('โหลดข้อมูลไม่สำเร็จ');return r.json();}
 async function apiPost(url,body={}){
   const pw=sessionStorage.getItem('editPassword')||'';
@@ -515,9 +498,6 @@ async function loadInitialState(){try{applyState(await apiGet('/api/state'));ren
 async function backgroundRefresh(){if(document.querySelector('.overlay.show'))return;try{applyState(await apiGet('/api/state'));render();}catch(e){}}
 setInterval(backgroundRefresh,6000);
 
-// ============================================================
-// EDIT MODE
-// ============================================================
 function updateEditModeUI(){
   document.body.classList.toggle('edit-mode',editMode);
   const btn=document.getElementById('lockBtn');
@@ -542,18 +522,14 @@ async function submitLogin(){
 document.getElementById('loginPwInput').addEventListener('keydown',e=>{if(e.key==='Enter')submitLogin();});
 function requireEditOrPrompt(){if(editMode)return true;openLogin();return false;}
 
-// SAVE INDICATOR
 let saveFlashTimer=null;
 function flashSave(){const el=document.getElementById('saveIndicator');el.textContent='✅ บันทึกแล้ว';clearTimeout(saveFlashTimer);saveFlashTimer=setTimeout(()=>{el.textContent='🌐 เชื่อมต่อเซิร์ฟเวอร์';},1800);}
 
-// ============================================================
-// RENDER
-// ============================================================
 function render(){renderHeader();renderTable();renderSummary();updateTotals();}
 function renderHeader(){
   document.getElementById('theadRow').innerHTML=
     '<th>#</th><th class="name-col">ชื่อ-สกุล</th>'+
-    DATES.map((d,di)=>'<th class="date-th">'+d+'<button class="del-date-btn edit-only" onclick="deleteDate('+di+')" title="ลบวันนี้">✕</button></th>').join('')+
+    DATES.map((d,di)=>'<th class="date-th">'+d+'<button class="checkall-date-btn edit-only" onclick="checkAllForDate('+di+')" title="ติ๊กทุกคนวันนี้">✓</button><button class="del-date-btn edit-only" onclick="deleteDate('+di+')" title="ลบวันนี้">✕</button></th>').join('')+
     '<th>รวม</th>';
 }
 function cellInnerHTML(sid,di){
@@ -585,7 +561,6 @@ function updateAfterPayment(sid,di){
 function renderSummary(){document.getElementById('summaryBar').innerHTML=DATES.map((d,di)=>'<div class="sum-card"><div class="date">'+d+'</div><div class="amt">฿'+totalByDate(di)+'</div></div>').join('');}
 function updateTotals(){const gt=grandTotal(),et=extraTotal(),exp=expenseTotal();document.getElementById('grandTotal').textContent='฿'+gt;document.getElementById('extraTotal').textContent='฿'+et;document.getElementById('expenseTotal').textContent='฿'+exp;document.getElementById('allTotal').textContent='฿'+(gt+et-exp);}
 
-// DATA HELPERS
 function getP(sid,di){return(payments[sid]||{})[di]||null;}
 function totalByDate(di){return STUDENTS.reduce((s,st)=>{const p=getP(st.id,di);return s+(p?p.amount:0);},0);}
 function totalByStudent(sid){return DATES.reduce((s,_,di)=>{const p=getP(sid,di);return s+(p?p.amount:0);},0);}
@@ -593,9 +568,6 @@ function grandTotal(){return STUDENTS.reduce((s,st)=>s+totalByStudent(st.id),0);
 function extraTotal(){return extraItems.reduce((s,e)=>s+(e.amount||0),0);}
 function expenseTotal(){return expenseItems.reduce((s,e)=>s+(e.amount||0),0);}
 
-// ============================================================
-// INTERACTIONS
-// ============================================================
 function handleClick(sid,di){const p=getP(sid,di);if(p){const s=STUDENTS.find(x=>x.id===sid);openConfirmDelete(sid,di,s?s.prefix+s.fname+' '+s.lname:'',DATES[di],p);return;}openAmountPicker(sid,di);}
 
 function openConfirmDelete(sid,di,name,date,p){pendingDelete={sid,di};const ic=p.method==='transfer'?'💸':'✅';const mt=p.method==='transfer'?'โอน':'สด';document.getElementById('confirmDelName').textContent=name;document.getElementById('confirmDelDetail').textContent=date+' — '+ic+' ฿'+p.amount+' ('+mt+')';document.getElementById('confirmDelOverlay').classList.add('show');}
@@ -621,6 +593,7 @@ async function confirmAddDate(){const v=document.getElementById('newDateInput').
 function closeAddDate(){document.getElementById('addDateOverlay').classList.remove('show');}
 document.getElementById('newDateInput').addEventListener('keydown',e=>{if(e.key==='Enter')confirmAddDate();});
 async function deleteDate(di){if(!requireEditOrPrompt())return;if(!confirm('ลบวันที่ "'+DATES[di]+'" และข้อมูลการชำระทั้งหมดในวันนั้น?'))return;try{const d=await apiPost('/api/dates/delete',{di});DATES=d.DATES;payments=d.payments;flashSave();render();}catch(e){}}
+async function checkAllForDate(di){if(!requireEditOrPrompt())return;if(!confirm('ติ๊กว่าทุกคนจ่ายแล้วสำหรับวันที่ "'+DATES[di]+'" หรือไม่? (เฉพาะคนที่ยังไม่ติ๊ก จะใช้วิธี "สด" ราคา ฿'+DEFAULT_AMOUNT+')'))return;try{const d=await apiPost('/api/dates/checkall',{di,method:'cash',amount:DEFAULT_AMOUNT});payments=d.payments;flashSave();renderTable();renderSummary();updateTotals();}catch(e){}}
 
 function openExtra(){renderExtraList();renderExpenseList();updateNetDisplay();document.getElementById('extraLabel').value='';document.getElementById('extraAmt').value='';document.getElementById('expenseLabel').value='';document.getElementById('expenseAmt').value='';switchTab(activeTab);document.getElementById('extraOverlay').classList.add('show');}
 function closeExtra(){document.getElementById('extraOverlay').classList.remove('show');}
@@ -641,11 +614,7 @@ async function doReset(){try{applyState(await apiPost('/api/reset',{}));flashSav
   document.getElementById(id).addEventListener('click',function(e){if(e.target===this)this.classList.remove('show');});
 });
 
-// ============================================================
-// STUDENT SUMMARY POPUP
-// ============================================================
 function openStudentSummary(){
-  // Build per-day stats
   const rows=DATES.map((d,di)=>{
     let cash=0,transfer=0,count=0;
     STUDENTS.forEach(s=>{const p=getP(s.id,di);if(p){count++;if(p.method==='transfer')transfer+=p.amount;else cash+=p.amount;}});
@@ -657,13 +626,11 @@ function openStudentSummary(){
   const totalPaid=STUDENTS.reduce((s,st)=>{let paid=false;DATES.forEach((_,di)=>{if(getP(st.id,di))paid=true;});return s+(paid?1:0);},0);
   const totalNotPaid=STUDENTS.length-totalPaid;
 
-  // Big cards
   document.getElementById('summBig').innerHTML=
     '<div style="background:#dcfce7;border-radius:10px;padding:10px 8px;text-align:center"><div style="font-size:10px;color:#15803d;font-weight:600">💵 เงินสด</div><div style="font-size:18px;font-weight:700;color:#15803d">฿'+totalCash+'</div></div>'+
     '<div style="background:#dbeafe;border-radius:10px;padding:10px 8px;text-align:center"><div style="font-size:10px;color:#1d4ed8;font-weight:600">📱 โอน</div><div style="font-size:18px;font-weight:700;color:#1d4ed8">฿'+totalTransfer+'</div></div>'+
     '<div style="background:#ede9fe;border-radius:10px;padding:10px 8px;text-align:center"><div style="font-size:10px;color:#7c3aed;font-weight:600">🎯 รวมทั้งสิ้น</div><div style="font-size:18px;font-weight:700;color:#7c3aed">฿'+totalAll+'</div></div>';
 
-  // Table body
   document.getElementById('summTableBody').innerHTML=rows.map(function(r,i){
     return '<tr style="background:'+(i%2?'#f8fafc':'#fff')+'">'+
       '<td style="padding:7px 10px;font-weight:600;white-space:nowrap">'+r.date+'</td>'+
@@ -674,7 +641,6 @@ function openStudentSummary(){
     '</tr>';
   }).join('');
 
-  // Footer
   document.getElementById('summTableFoot').innerHTML=
     '<tr style="background:#1e3a8a;color:#fff;font-weight:700">'+
       '<td style="padding:8px 10px">รวม</td>'+
@@ -691,48 +657,54 @@ function openStudentSummary(){
   document.getElementById('studentSummaryOverlay').classList.add('show');
 }
 
-// ============================================================
-// EXPORT SUMMARY AS IMAGE
-// ============================================================
 async function exportSummaryImage(){
-  // Build full-detail table HTML for export
-  const rows=DATES.map((d,di)=>{
-    let cash=0,transfer=0,count=0;
-    STUDENTS.forEach(s=>{const p=getP(s.id,di);if(p){count++;if(p.method==='transfer')transfer+=p.amount;else cash+=p.amount;}});
-    return{date:d,cash,transfer,total:cash+transfer,count};
-  });
-  const totalCash=rows.reduce((s,r)=>s+r.cash,0);
-  const totalTransfer=rows.reduce((s,r)=>s+r.transfer,0);
+  let totalCash=0,totalTransfer=0,totalPaid=0;
+  DATES.forEach((_,di)=>{STUDENTS.forEach(s=>{const p=getP(s.id,di);if(p){if(p.method==='transfer')totalTransfer+=p.amount;else totalCash+=p.amount;}});});
+  STUDENTS.forEach(st=>{let paid=false;DATES.forEach((_,di)=>{if(getP(st.id,di))paid=true;});if(paid)totalPaid++;});
   const totalAll=totalCash+totalTransfer;
-  const totalPaid=STUDENTS.reduce((s,st)=>{let paid=false;DATES.forEach((_,di)=>{if(getP(st.id,di))paid=true;});return s+(paid?1:0);},0);
+  const totalNotPaid=STUDENTS.length-totalPaid;
 
   const now=new Date();
   const dd=now.getDate(),mm=now.getMonth()+1,yyyy=now.getFullYear();
   const hh=String(now.getHours()).padStart(2,'0'),min=String(now.getMinutes()).padStart(2,'0');
   const dateStr=dd+'/'+mm+'/'+yyyy+' '+hh+':'+min;
-  const rowsHtml=rows.map(function(r){return '<tr><td style="font-weight:600">'+r.date+'</td><td style="color:#15803d">'+(r.cash?'฿'+r.cash:'-')+'</td><td style="color:#1d4ed8">'+(r.transfer?'฿'+r.transfer:'-')+'</td><td style="font-weight:700">'+(r.total?'฿'+r.total:'-')+'</td><td style="color:#6b7280">'+(r.count?r.count+'คน':'-')+'</td></tr>';}).join('');
+
+  const dateHeadHtml=DATES.map(d=>'<th>'+d+'</th>').join('');
+  const studentRowsHtml=STUDENTS.map(function(s,idx){
+    const cellsHtml=DATES.map(function(_,di){
+      const p=getP(s.id,di);
+      if(p){
+        const ic=p.method==='transfer'?'&#x1F4F8;':'&#x2705;';
+        const color=p.method==='transfer'?'#1d4ed8':'#15803d';
+        return '<td style="color:'+color+';font-weight:600">'+ic+'<br>฿'+p.amount+'</td>';
+      }
+      return '<td class="unpaid">ยังไม่จ่าย</td>';
+    }).join('');
+    const tot=totalByStudent(s.id);
+    return '<tr><td class="name-cell">'+(idx+1)+'. '+s.prefix+s.fname+' '+s.lname+'</td>'+cellsHtml+'<td style="font-weight:700;color:'+(tot>0?'#2563eb':'#9ca3af')+'">'+(tot>0?'฿'+tot:'-')+'</td></tr>';
+  }).join('');
+  const footDateCellsHtml=DATES.map((_,di)=>'<td>฿'+totalByDate(di)+'</td>').join('');
+
   const html='<!DOCTYPE html><html><head><meta charset="UTF-8">'+
 '<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">'+
-'<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Sarabun,sans-serif;background:#f1f5f9;padding:24px;min-width:480px}.card{background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px #0002;max-width:560px;margin:0 auto}.hdr{background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;padding:18px 20px 14px}.hdr h1{font-size:16px;font-weight:700}.hdr p{font-size:11px;opacity:.8;margin-top:2px}.big-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;padding:14px 16px}.big-card{border-radius:10px;padding:12px 10px;text-align:center}.big-card .lbl{font-size:10px;font-weight:600;margin-bottom:4px}.big-card .val{font-size:20px;font-weight:700}table{width:100%;border-collapse:collapse;font-size:12px}thead tr{background:#1e3a8a;color:#fff}th{padding:9px 10px;text-align:left;white-space:nowrap}th:not(:first-child){text-align:right}td{padding:8px 10px;border-bottom:1px solid #f1f5f9}td:not(:first-child){text-align:right}tr:nth-child(even) td{background:#f8fafc}tfoot tr:first-child td{background:#1e3a8a;color:#fff;font-weight:700;padding:9px 10px}tfoot tr:last-child td{background:#f0f9ff;font-size:11px;color:#374151;padding:7px 10px}.foot-note{text-align:center;font-size:10px;color:#9ca3af;padding:10px;border-top:1px solid #f1f5f9}</style></head><body>'+
+'<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Sarabun,sans-serif;background:#f1f5f9;padding:24px}.card{background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 2px 12px #0002;margin:0 auto;display:inline-block;max-width:100%}.hdr{background:linear-gradient(135deg,#1e3a8a,#2563eb);color:#fff;padding:18px 20px 14px}.hdr h1{font-size:16px;font-weight:700}.hdr p{font-size:11px;opacity:.8;margin-top:2px}.big-row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;padding:14px 16px}.big-card{border-radius:10px;padding:12px 10px;text-align:center}.big-card .lbl{font-size:10px;font-weight:600;margin-bottom:4px}.big-card .val{font-size:18px;font-weight:700}.grid-wrap{overflow-x:auto;padding:0 16px 16px}table{border-collapse:collapse;font-size:11px;white-space:nowrap}thead tr{background:#1e3a8a;color:#fff}th{padding:7px 8px;text-align:center}th:first-child{text-align:left}td{padding:6px 8px;text-align:center;border-bottom:1px solid #f1f5f9}td.name-cell{text-align:left;font-weight:600;white-space:nowrap}tr:nth-child(even) td{background:#f8fafc}td.unpaid{background:#fee2e2;color:#dc2626;font-weight:600}tfoot tr td{background:#1e3a8a;color:#fff;font-weight:700}.foot-note{text-align:center;font-size:10px;color:#9ca3af;padding:10px;border-top:1px solid #f1f5f9}</style></head><body>'+
 '<div class="card">'+
-'<div class="hdr"><h1>&#x1F4CA; สรุปรายได้จากนักเรียน ม.6/3</h1><p>ออกรายงาน: '+dateStr+'</p></div>'+
+'<div class="hdr"><h1>&#x1F4CA; สรุปการจ่ายเงิน นักเรียน ม.6/3</h1><p>ออกรายงาน: '+dateStr+'</p></div>'+
 '<div class="big-row">'+
 '<div class="big-card" style="background:#dcfce7"><div class="lbl" style="color:#15803d">&#x1F4B5; เงินสด</div><div class="val" style="color:#15803d">฿'+totalCash+'</div></div>'+
 '<div class="big-card" style="background:#dbeafe"><div class="lbl" style="color:#1d4ed8">&#x1F4F1; โอน</div><div class="val" style="color:#1d4ed8">฿'+totalTransfer+'</div></div>'+
-'<div class="big-card" style="background:#ede9fe"><div class="lbl" style="color:#7c3aed">&#x1F3AF; รวมทั้งสิ้น</div><div class="val" style="color:#7c3aed">฿'+totalAll+'</div></div>'+
+'<div class="big-card" style="background:#dcfce7"><div class="lbl" style="color:#15803d">&#x2705; จ่ายแล้ว</div><div class="val" style="color:#15803d">'+totalPaid+'/'+STUDENTS.length+'</div></div>'+
+'<div class="big-card" style="background:#fee2e2"><div class="lbl" style="color:#dc2626">&#x274C; ยังไม่จ่าย</div><div class="val" style="color:#dc2626">'+totalNotPaid+' คน</div></div>'+
 '</div>'+
-'<table>'+
-'<thead><tr><th>วันที่</th><th>สด</th><th>โอน</th><th>รวม</th><th>คน</th></tr></thead>'+
-'<tbody>'+rowsHtml+'</tbody>'+
-'<tfoot>'+
-'<tr><td>รวมทั้งหมด</td><td>฿'+totalCash+'</td><td>฿'+totalTransfer+'</td><td>฿'+totalAll+'</td><td>'+totalPaid+'คน</td></tr>'+
-'<tr><td colspan="3">จ่ายแล้ว '+totalPaid+'/'+STUDENTS.length+' คน ยังไม่จ่าย '+(STUDENTS.length-totalPaid)+' คน</td><td colspan="2" style="text-align:right">฿'+totalAll+'</td></tr>'+
-'</tfoot></table>'+
+'<div class="grid-wrap"><table>'+
+'<thead><tr><th>ชื่อ-สกุล</th>'+dateHeadHtml+'<th>รวม</th></tr></thead>'+
+'<tbody>'+studentRowsHtml+'</tbody>'+
+'<tfoot><tr><td>รวมทั้งหมด</td>'+footDateCellsHtml+'<td>฿'+totalAll+'</td></tr></tfoot>'+
+'</table></div>'+
 '<div class="foot-note">ระบบเช็คการจ่ายเงินห้อง ม.6/3 ออกรายงาน '+dateStr+'</div>'+
 '</div></body></html>';
 
-  // Open print window
-  const win=window.open('','_blank','width=600,height=700');
+  const win=window.open('','_blank','width=900,height=700');
   win.document.write(html);
   win.document.close();
   win.onload=()=>{
